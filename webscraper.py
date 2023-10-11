@@ -53,10 +53,17 @@ class WebScraper():
 
             div = soup.find('div', class_="mw-parser-output")
 
-           # Remove unwanted elements like references and table of contents
-            for unwanted_div in div.find_all(['table', 'ol']):
-                unwanted_div.extract()
+            unwanted_elements = [div.find('div', class_="toc")]
+            unwanted_elements.extend(div.find('div', class_="reflist"))
+            unwanted_elements.extend(div.find_all('div', class_="div-col columns column-width"))
+            unwanted_elements.extend(div.find_all('table'))
+            unwanted_elements.extend(div.find_all(['h1','h2','h3']))
 
+
+
+            for element in unwanted_elements:
+                if element is not None:
+                    element.extract()
             title = soup.find('h1', class_="page-header__title")
 
             # Clean and format the title for use as a filename
@@ -67,7 +74,7 @@ class WebScraper():
             path = os.path.expanduser("~/MTG-scraper/data/") + title + ".txt"
 
             with open(path, "w", encoding="utf-8") as file:
-                for chunk in div.get_text():
+                for chunk in div.get_text(strip=True):
                     file.write(chunk)
 
     def threaded_scrape(self, max_workers):
@@ -79,4 +86,8 @@ class WebScraper():
 
 webscraper = WebScraper(seed_url="https://mtg.fandom.com/wiki/Timeline", keyword='mtg.fandom',
                         exclusions=['cite', 'Category', "Timeline", "veaction", "action", "sources"])
-webscraper.threaded_scrape(max_workers=4)
+webscraper.crawl()
+webscraper.scrape()
+webscraper.scrape()
+webscraper.scrape()
+webscraper.scrape()
