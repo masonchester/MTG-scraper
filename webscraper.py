@@ -1,10 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
+from bs4 import SoupStrainer
 from urllib.parse import urljoin
 from queue import Queue
 import requests
 import os
 import re
+import json
 
 
 class WebScraper():
@@ -53,7 +55,8 @@ class WebScraper():
 
         if response.status_code == 200:
 
-            soup = BeautifulSoup(response.content, 'html.parser')
+            divs = SoupStrainer('div')
+            soup = BeautifulSoup(response.content, parse_only=divs,features='html.parser')
 
             div = soup.find('div', class_="mw-parser-output")
 
@@ -78,11 +81,13 @@ class WebScraper():
             title = re.sub(r'\s+', '-', title)
 
             # Build the file path
-            path = os.path.expanduser("~/MTG-scraper/data/") + title + ".txt"
+            path = os.path.expanduser("~/MTG-scraper/data/") + title + ".json"
 
             with open(path, "w", encoding="utf-8") as file:
-                for chunk in div.get_text():
-                    file.write(chunk)
+                data = {
+                    "text":div.get_text(" ",strip=True)
+                }
+                json.dump(data, file)
 
     def threaded_scrape(self, max_workers):
         """runs the scrape method on the number of thread specified by max_workers"""
