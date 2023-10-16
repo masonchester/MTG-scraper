@@ -11,6 +11,7 @@ import json
 
 class WebScraper():
     """Class for creating a webscraper object to scrape"""
+
     def __init__(self, seed_url, keyword, exclusions):
 
         self.seed_url = seed_url
@@ -18,6 +19,7 @@ class WebScraper():
         self.exclusions = exclusions
         self.job_queue = Queue()
         self.found_urls = set()
+        self.count = 0;
 
     def crawl(self):
         """Function for crawling the seed_url and extracting all relevant URL's"""
@@ -45,23 +47,26 @@ class WebScraper():
                         if not any(exclusion in full_url for exclusion in self.exclusions):
                             self.job_queue.put(full_url)
                             self.found_urls.add(full_url)
+            print("Number of files found:", len(self.job_queue.queue))
 
-    def scrape(self):
+    def scrape(self, url):
         """Function for scraping found urls in seed_url."""
-
-        url = self.job_queue.get()
 
         response = requests.get(url, timeout=5)
 
         if response.status_code == 200:
 
+            # Save memory by usig soupstrainer object only parsing div's
             divs = SoupStrainer('div')
-            soup = BeautifulSoup(response.content, parse_only=divs,features='html.parser')
+            soup = BeautifulSoup(
+                response.content, parse_only=divs, features='html.parser')
 
             div = soup.find('div', class_="mw-parser-output")
 
-            unwanted_elements = [div.find('div', class_="toc"), 
-                                 div.find('ul', class_="gallery mw-gallery-traditional"),
+            # Remove the unwanted elements.
+            unwanted_elements = [div.find('div', class_="toc"),
+                                 div.find(
+                                     'ul', class_="gallery mw-gallery-traditional"),
                                  div.find('dl')]
             unwanted_elements.extend(div.find('div', class_="reflist"))
             unwanted_elements.extend(div.find_all(
@@ -83,26 +88,31 @@ class WebScraper():
             # Build the file path
             path = os.path.expanduser("~/MTG-scraper/data/") + title + ".json"
 
-            with open(path, "w", encoding="utf-8") as file:
-                data = {
-                    "text":div.get_text(" ",strip=True)
-                }
-                json.dump(data, file)
+            # If fille does not exits open and write to that file
+            if not os.path.isfile(path):
+                # Write JSON to path
+                with open(path, "w", encoding="utf-8") as file:
+                    data = {
+                        "text": div.get_text(" ", strip=True)
+                    }
+                    json.dump(data, file)
+            self.count += 1
+            print("File number: ", self.count)
 
     def threaded_scrape(self, max_workers):
         """runs the scrape method on the number of thread specified by max_workers"""
-        self.crawl()
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             while not self.job_queue.empty():
-                executor.submit(self.scrape)
+                url = self.job_queue.get()
+                executor.submit(self.scrape, url)
 
 
 webscraper = WebScraper(seed_url="https://mtg.fandom.com/wiki/Timeline", keyword='mtg.fandom',
                         exclusions=['cite',
-                                    'Category', 
-                                    "Timeline", 
-                                    "veaction", 
-                                    "action", 
+                                    'Category',
+                                    "Timeline",
+                                    "veaction",
+                                    "action",
                                     "sources"])
-
-webscraper.threaded_scrape(max_workers=4)
+webscraper.crawl()
+webscraper.threaded_scrape(max_workers=10)
